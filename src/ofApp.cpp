@@ -92,6 +92,7 @@ void ofApp::setup(){
 	}
 
 	gforce = new GravityForce(ofVec3f(0, -2, 0));
+	tforce = new TurbulenceForce(ofVec3f(-10, -10, -10), ofVec3f(10, 10, 10));
 
 	// create sliders for testing
 	//
@@ -149,6 +150,7 @@ void ofApp::update() {
 	lander.setRotation(0, landerRotation, 0, 1, 0);
 
 	landerForce += gforce->getForce() * landerMass;
+	landerForce += glm::vec3(ofRandom(tforce->getMin().x, tforce->getMax().x), ofRandom(tforce->getMin().y, tforce->getMax().y), ofRandom(tforce->getMin().z, tforce->getMax().z));
 
 	if (thrust) {
 		landerForce += glm::vec3(0, 10, 0);

@@ -42,4 +42,6 @@ class TurbulenceForce : public ParticleForce {
 public:
 	TurbulenceForce(const ofVec3f & min, const ofVec3f &max);
 	void updateForce(Particle *);
+	ofVec3f getMin();
+	ofVec3f getMax();
 };

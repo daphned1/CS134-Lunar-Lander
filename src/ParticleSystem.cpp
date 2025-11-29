@@ -95,3 +95,11 @@ void TurbulenceForce::updateForce(Particle * particle) {
 	particle->forces.y += ofRandom(tmin.y, tmax.y);
 	particle->forces.z += ofRandom(tmin.z, tmax.z);
 }
+
+ofVec3f TurbulenceForce::getMin() {
+	return tmin;
+}
+
+ofVec3f TurbulenceForce::getMax() {
+	return tmax;
+}
