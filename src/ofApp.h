@@ -46,6 +46,8 @@ class ofApp : public ofBaseApp{
 		bool inSite(ofLight& site, glm::vec3 landingPos, float angle, float radius);
 		void checkLandingPosition(glm::vec3 landingPos);
 		void drawLandingRing(glm::vec3 pos, float radius);
+		void trackFuel();
+		void resetGame();
 
 		ofxAssimpModelLoader mars, lander;
 		Box boundingBox, landerBounds;
@@ -94,6 +96,7 @@ class ofApp : public ofBaseApp{
 		bool backward = false;
 		bool left = false;
 		bool right = false;
+		bool keypressed = false;
 
 		bool thrust = false;
 		bool thrusterOn = false;
@@ -118,6 +121,9 @@ class ofApp : public ofBaseApp{
 		// Emitters
 		ParticleEmitter emitter;
 		ParticleEmitter explosionEmitter;
+		float explosionElapsed;
+		float landingElapsed;
+		float fuelTimeElapsed;
 
 		// Other forces
 		GravityForce* gforce;
@@ -158,4 +164,12 @@ class ofApp : public ofBaseApp{
 		// Landing sites
 		glm::vec3 site, site2, site3;
 		float landingRadius;
+
+		// Fuel
+		float fuel, initFuel, usedFuel, fuelElapsed;
+		bool updateFuel = false;
+
+		// Game states
+		bool gameOngoing, gameOver, gameDone, gameEnd, gameFuel; 
+		bool startScreen = true;
 };

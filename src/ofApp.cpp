@@ -91,6 +91,15 @@ void ofApp::setup(){
 	//turn on background sound
 	backgroundSnd.play();
 
+	/* -------------------------------------------------------------------------- */
+	/*                         Setup Fuel and Game States                         */
+	/* -------------------------------------------------------------------------- */
+	fuel = 120;
+	initFuel = 120;
+	usedFuel = 0;
+
+	gameOngoing = false;
+	gameOver = false;
 
 	/* -------------------------------------------------------------------------- */
 	/*                                 Load models                                */
@@ -102,7 +111,7 @@ void ofApp::setup(){
 	if (lander.loadModel("geo/MoonLander.obj")) {
 		bLanderLoaded = true;
 		lander.setScaleNormalization(false);
-		lander.setPosition(0, 50, 0);
+		lander.setPosition(0, 80, 0);
 		landerPos = glm::vec3(0, 50, 0);
 		// cout << "number of meshes: " << lander.getNumMeshes() << endl;
 		bboxList.clear();
@@ -235,7 +244,6 @@ void ofApp::setup(){
 	mainCam.setPosition(150, 78, 124);
 	mainCam.lookAt(landerPos);
 	
-
 	//Tracking camera
 	trackCam.setPosition(landerPos.x, landerPos.y + 20 , landerPos.z + 45);
 	trackCam.lookAt(landerPos);
@@ -257,13 +265,14 @@ void ofApp::setup(){
 	/* -------------------------------------------------------------------------- */
 	/*                                 GUI                                        */
 	/* -------------------------------------------------------------------------- */
-	gui.setup();
-	gui.add(numLevels.setup("Number of Octree Levels", 1, 1, 10));
-	bHide = false;
-	gui.add(landerLightOn.set("Lander Light On:", true));
-	gui.add(backgroundMusicOn.set("Background Music On:", true));
-	camName.set("Camera", "Fixed Camera (1)");
-	gui.add(camName);
+	// gui.setup();
+	// gui.add(numLevels.setup("Number of Octree Levels", 1, 1, 10));
+	// bHide = false;
+	// gui.add(landerLightOn.set("Lander Light On:", true));
+	// gui.add(backgroundMusicOn.set("Background Music On:", true));
+	// camName.set("Camera", "Fixed Camera (1)");
+	// gui.add(camName);
+	landerLightOn = true;
 
 
 	/* -------------------------------------------------------------------------- */
@@ -286,184 +295,216 @@ void ofApp::setup(){
 //--------------------------------------------------------------
 
 void ofApp::update() {
-	/* -------------------------------------------------------------------------- */
-	/*                                   Cameras                                  */
-	/* -------------------------------------------------------------------------- */
-	if (currentCam == 2) {
-		ofVec3f currentPos = trackCam.getPosition();
-		ofVec3f targetPos = ofVec3f(landerPos.x, landerPos.y + 20, landerPos.z + 45);
-		trackCam.setPosition(currentPos.interpolate(targetPos, 0.1));
-		trackCam.lookAt(lander.getPosition());
-	}
-	else if (currentCam == 3) {
-		ofVec3f currentPos = landerCam.getPosition();
-		ofVec3f targetPos = ofVec3f(landerPos.x, landerPos.y + 50, landerPos.z);
-		landerCam.setPosition(currentPos.interpolate(targetPos, 0.1));
-		// ONBOARD CAM — attach to lander
-		landerCam.lookAt(lander.getPosition(), glm::vec3(0, 0, -1));
-	}
-	else if (currentCam == 4) {
-		ofVec3f currentPos = cabinCam.getPosition();
-		ofVec3f targetPos = ofVec3f(landerPos.x, landerPos.y + 10, landerPos.z);
-		cabinCam.setPosition(currentPos.interpolate(targetPos, 0.1));
-		cabinCam.lookAt(landerPos + glm::vec3(0, 10, 0) - glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0,1,0)) * glm::vec4(0,0,-1,1)) * 10);
-	}
-
-	/* -------------------------------------------------------------------------- */
-	/*                                  Emitters                                  */
-	/* -------------------------------------------------------------------------- */
-	landerPos = lander.getPosition();
-	emitter.position = glm::vec3(landerPos.x, landerPos.y - 1, landerPos.z);
-	explosionEmitter.position = landerPos;
-	
-	emitter.update();
-	explosionEmitter.update();
-	lander.update();
-
-	/* -------------------------------------------------------------------------- */
-	/*                                   Physics                                  */
-	/* -------------------------------------------------------------------------- */
-	float frameRate = ofGetFrameRate();
-
-	if (frameRate > 0) {
-		dt = 1.0/frameRate;
-	}
-	else {
-		dt = 0.0f;
-	}
-
-	// Linear physics
-	landerPos += landerVel * dt;
-	landerAccel = (1 / landerMass) * landerForce;
-	landerVel += landerAccel * dt;
-	landerVel *= damping;
-
-	// Rotation
-	landerRotation += angularVel * dt;
-	angularAccel = (1 / landerMass) * angularForce;
-	angularVel += angularAccel * dt;
-	angularVel *= damping;
-
-	// Reset forces
-	landerForce = glm::vec3(0, 0, 0);
-	angularForce = 0.0f;
-
-	lander.setPosition(landerPos.x, landerPos.y, landerPos.z);
-	lander.setRotation(0, landerRotation, 0, 1, 0);
-
-	landerForce += gforce->getForce() * landerMass;
-	landerForce += glm::vec3(ofRandom(tforce->getMin().x, tforce->getMax().x), ofRandom(tforce->getMin().y, tforce->getMax().y), ofRandom(tforce->getMin().z, tforce->getMax().z));
-
-	if (thrust) {
-		landerForce += glm::vec3(0, 10, 0);
-		if (!thrusterOn) {
-			emitter.start();
-			thrusterSnd.play();
+	if (gameOngoing) {
+		/* -------------------------------------------------------------------------- */
+		/*                                   Cameras                                  */
+		/* -------------------------------------------------------------------------- */
+		if (currentCam == 2) {
+			ofVec3f currentPos = trackCam.getPosition();
+			ofVec3f targetPos = ofVec3f(landerPos.x, landerPos.y + 20, landerPos.z + 45);
+			trackCam.setPosition(currentPos.interpolate(targetPos, 0.1));
+			trackCam.lookAt(lander.getPosition());
 		}
-		thrusterOn = true;
-	}
-	else if (!thrust) {
-		if (thrusterOn) {
-			emitter.stop();
-			emitter.sys->reset();
-			thrusterSnd.stop();
+		else if (currentCam == 3) {
+			ofVec3f currentPos = landerCam.getPosition();
+			ofVec3f targetPos = ofVec3f(landerPos.x, landerPos.y + 50, landerPos.z);
+			landerCam.setPosition(currentPos.interpolate(targetPos, 0.1));
+			// ONBOARD CAM — attach to lander
+			landerCam.lookAt(lander.getPosition(), glm::vec3(0, 0, -1));
 		}
-		thrusterOn = false;
-	}
-	if (forward) {
-		// landerForce += glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0, 1, 0)) * glm::vec4(1, 0, 0, 1)) * 10;
-		landerForce -= glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0,1,0)) * glm::vec4(0,0,-1,1)) * 10;
-		forwardSnd.play();
-	}
-	if (backward) {
-		landerForce += glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0,1,0)) * glm::vec4(0,0,-1,1)) * 10;
-		backwardSnd.play();
-	}
-	if (left) {
-		angularForce += 50;
-		turnSnd.play();
-	}
-	if (right) {
-		angularForce -= 50;
-		turnSnd.play();
-	}
+		else if (currentCam == 4) {
+			ofVec3f currentPos = cabinCam.getPosition();
+			ofVec3f targetPos = ofVec3f(landerPos.x, landerPos.y + 10, landerPos.z);
+			cabinCam.setPosition(currentPos.interpolate(targetPos, 0.1));
+			cabinCam.lookAt(landerPos + glm::vec3(0, 10, 0) - glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0,1,0)) * glm::vec4(0,0,-1,1)) * 10);
+		}
 
-	// Get Altitude
-	if (bAGL) {
-		getAGL();
-	}
+		/* -------------------------------------------------------------------------- */
+		/*                                  Emitters                                  */
+		/* -------------------------------------------------------------------------- */
+		landerPos = lander.getPosition();
+		emitter.position = glm::vec3(landerPos.x, landerPos.y - 1, landerPos.z);
+		explosionEmitter.position = landerPos;
+		
+		emitter.update();
+		explosionEmitter.update();
+		lander.update();
 
-	/* -------------------------------------------------------------------------- */
-	/*                                  Collision                                 */
-	/* -------------------------------------------------------------------------- */
-	ofVec3f min = lander.getSceneMin() + lander.getPosition();
-	ofVec3f max = lander.getSceneMax() + lander.getPosition();
+		/* -------------------------------------------------------------------------- */
+		/*                                   Physics                                  */
+		/* -------------------------------------------------------------------------- */
+		float frameRate = ofGetFrameRate();
 
-	Box bounds = Box(Vector3(min.x, min.y, min.z), Vector3(max.x, max.y, max.z));
+		if (frameRate > 0) {
+			dt = 1.0/frameRate;
+		}
+		else {
+			dt = 0.0f;
+		}
 
-	colBoxList.clear();
-	octree.intersect(bounds, octree.root, colBoxList);
+		// Linear physics
+		landerPos += landerVel * dt;
+		landerAccel = (1 / landerMass) * landerForce;
+		landerVel += landerAccel * dt;
+		landerVel *= damping;
 
-	// Check if in collided state
-	if (colBoxList.size() >= 15) {
-		// Check explosion
-		if (glm::length(landerVel) > 3) {
-			// Add explosions
-			if (!exploded) {
-				explosionEmitter.start();
-				explosionSnd.play();
+		// Rotation
+		landerRotation += angularVel * dt;
+		angularAccel = (1 / landerMass) * angularForce;
+		angularVel += angularAccel * dt;
+		angularVel *= damping;
+
+		// Reset forces
+		landerForce = glm::vec3(0, 0, 0);
+		angularForce = 0.0f;
+
+		lander.setPosition(landerPos.x, landerPos.y, landerPos.z);
+		lander.setRotation(0, landerRotation, 0, 1, 0);
+
+		landerForce += gforce->getForce() * landerMass;
+		landerForce += glm::vec3(ofRandom(tforce->getMin().x, tforce->getMax().x), ofRandom(tforce->getMin().y, tforce->getMax().y), ofRandom(tforce->getMin().z, tforce->getMax().z));
+
+		if (!gameOver && !gameEnd && !gameDone) {
+			if (thrust && fuel > 0) {
+				landerForce += glm::vec3(0, 10, 0);
+				if (!thrusterOn) {
+					emitter.start();
+					thrusterSnd.play();
+				}
+				thrusterOn = true;
+				keypressed = true;
 			}
-			cout << "Too fast, exploded." << endl; 
-
-			int r1 = 0;
-			int r2 = 0;
-			if (ofRandom(-1, 1) > 0) r1 = 1;
-			else r1 = -1;
-
-			if (ofRandom(-1, 1) > 0) r2 = 1;
-			else r2 = -1;
-
-			// landerForce += glm::vec3(r1 * 3000, 3000, r2 * 3000);
-			// return;
-		}
-		else if (glm::length(landerVel) < 3) {
-			// Smooth landing
-			cout << "Smooth landing." << endl;
-			checkLandingPosition(lander.getPosition());
-			successLandSnd.play();
-		}
-
-		// 1. Find lander box center
-		glm::vec3 landerBox = glm::vec3(bounds.center().x(), bounds.center().y(), bounds.center().z());
-
-		// 2. Find nearest collided terrain box
-		glm::vec3 terrainBox;
-		float min = FLT_MAX;
-		for (int i = 0; i < colBoxList.size(); i++) {
-			Vector3 center = colBoxList[i].center();
-			glm::vec3 box = glm::vec3(center.x(), center.y(), center.z());
-			float distance = glm::length(landerBox - box);
-			if (distance < min) {
-				min = distance;
-				terrainBox = box;
+			else if (!thrust) {
+				if (thrusterOn) {
+					emitter.stop();
+					emitter.sys->reset();
+					thrusterSnd.stop();
+				}
+				thrusterOn = false;
 			}
+			
+			if (fuel > 0) {
+				if (forward) {
+					// landerForce += glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0, 1, 0)) * glm::vec4(1, 0, 0, 1)) * 10;
+					landerForce -= glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0,1,0)) * glm::vec4(0,0,-1,1)) * 10;
+					forwardSnd.play();
+					keypressed = true;
+				}
+				if (backward) {
+					landerForce += glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0,1,0)) * glm::vec4(0,0,-1,1)) * 10;
+					backwardSnd.play();
+					keypressed = true;
+				}
+				if (left) {
+					angularForce += 50;
+					turnSnd.play();
+					keypressed = true;
+				}
+				if (right) {
+					angularForce -= 50;
+					turnSnd.play();
+					keypressed = true;
+				}
+			}
+			trackFuel();
 		}
 
-		// 3. Add bounce
-		float bounce = 0.1;
+		// Get Altitude
+		if (bAGL) {
+			getAGL();
+		}
 
-		// 4. Find normal
-		glm::vec3 normal = glm::normalize(landerBox - terrainBox);
-		glm::vec3 impulse = (bounce + 1) * (-glm::dot(landerVel, normal)) * normal;
+		/* -------------------------------------------------------------------------- */
+		/*                                  Collision                                 */
+		/* -------------------------------------------------------------------------- */
+		ofVec3f min = lander.getSceneMin() + lander.getPosition();
+		ofVec3f max = lander.getSceneMax() + lander.getPosition();
 
-		landerVel = impulse;
+		Box bounds = Box(Vector3(min.x, min.y, min.z), Vector3(max.x, max.y, max.z));
+
+		colBoxList.clear();
+		octree.intersect(bounds, octree.root, colBoxList);
+
+		// Check if in collided state
+		if (colBoxList.size() >= 15) {
+			// Check explosion
+			if (glm::length(landerVel) > 3 && !gameDone && !gameEnd && !gameOver) {
+				// Add explosions
+				if (!exploded) {
+					explosionEmitter.start();
+					explosionSnd.play();
+				}
+				cout << "Too fast, exploded." << endl; 
+				explosionElapsed = ofGetElapsedTimef();
+
+				int r1 = 0;
+				int r2 = 0;
+				if (ofRandom(-1, 1) > 0) r1 = 1;
+				else r1 = -1;
+
+				if (ofRandom(-1, 1) > 0) r2 = 1;
+				else r2 = -1;
+
+				landerForce += glm::vec3(r1 * 3000, 3000, r2 * 3000);
+				gameOver = true;
+				return;
+			}
+			else if (glm::length(landerVel) < 3) {
+				// Smooth landing
+				cout << "Smooth landing." << endl;
+				checkLandingPosition(lander.getPosition());
+				gameOngoing = false;
+				successLandSnd.play();
+				landingElapsed = ofGetElapsedTimef();
+			}
+
+			// 1. Find lander box center
+			glm::vec3 landerBox = glm::vec3(bounds.center().x(), bounds.center().y(), bounds.center().z());
+
+			// 2. Find nearest collided terrain box
+			glm::vec3 terrainBox;
+			float min = FLT_MAX;
+			for (int i = 0; i < colBoxList.size(); i++) {
+				Vector3 center = colBoxList[i].center();
+				glm::vec3 box = glm::vec3(center.x(), center.y(), center.z());
+				float distance = glm::length(landerBox - box);
+				if (distance < min) {
+					min = distance;
+					terrainBox = box;
+				}
+			}
+
+			// 3. Add bounce
+			float bounce = 0.1;
+
+			// 4. Find normal
+			glm::vec3 normal = glm::normalize(landerBox - terrainBox);
+			glm::vec3 impulse = (bounce + 1) * (-glm::dot(landerVel, normal)) * normal;
+
+			landerVel = impulse;
+		}
 	}
 	if (exploded) {
 		explosionEmitter.stop();
 		explosionEmitter.sys->reset();
 		exploded = false;
+		gameOngoing = false;
 	}
-
+	if (gameOver) {
+		if (ofGetElapsedTimef() - explosionElapsed > 3) {
+			resetGame();
+		}
+	}
+	if (gameDone || gameEnd) {
+		if (ofGetElapsedTimef() - landingElapsed > 3) {
+			resetGame();
+		}
+	}
+	if (gameFuel) {
+		if (ofGetElapsedTimef() - fuelTimeElapsed > 3) {
+			resetGame();
+		}
+	}
 }
 
 //--------------------------------------------------------------
@@ -631,8 +672,90 @@ void ofApp::draw() {
 	/*                                   Draw UI                                  */
 	/* -------------------------------------------------------------------------- */
 	glDepthMask(false);
-	if (!bHide) gui.draw();
-	if (bAGL) ofDrawBitmapString("Altitude: " + ofToString(altitude, 2), 15 * 2, 60 * 2);
+	// if (!bHide) gui.draw();
+	ofSetColor(ofColor::white);
+
+	// Ongoing game
+	if (gameOngoing && !gameDone && !gameEnd && !gameOver && !gameFuel) {
+		ofDrawBitmapString("Fuel: " + ofToString(fuel, 2), 15 * 2, 30 * 2);
+		if (bAGL) ofDrawBitmapString("Altitude: " + ofToString(altitude, 2), 15 * 2, 45 * 2);
+
+		ofBitmapFont font = ofBitmapFont();
+		string text = "UP/DOWN = Move Forward/Backward";
+		int width = font.getBoundingBox(text, 0, 0).getWidth();
+		int startY = 15 * 2;
+		int lineHeight = 15 * 2;
+		ofDrawBitmapString("SPACE = Thrust", ofGetWidth() - width - 15 * 2, startY + lineHeight * 0);
+		ofDrawBitmapString("UP/DOWN = Move Forward/Backward", ofGetWidth() - width - 15 * 2, startY + lineHeight * 1);
+		ofDrawBitmapString("RIGHT/LEFT = Turning", ofGetWidth() - width - 15 * 2, startY + lineHeight * 2);
+		ofDrawBitmapString("1 = Static Camera", ofGetWidth() - width - 15 * 2, startY + lineHeight * 3);
+		ofDrawBitmapString("2 = Tracking Camera", ofGetWidth() - width - 15 * 2, startY + lineHeight * 4);
+		ofDrawBitmapString("3 = Overhead Camera", ofGetWidth() - width - 15 * 2, startY + lineHeight * 5);
+		ofDrawBitmapString("4 = Cabin Camera", ofGetWidth() - width - 15 * 2, startY + lineHeight * 6);
+		ofDrawBitmapString("a = Toggle Lander Light", ofGetWidth() - width - 15 * 2, startY + lineHeight * 7);
+		ofDrawBitmapString("h = AGL", ofGetWidth() - width - 15 * 2, startY + lineHeight * 8);
+	}
+	// Success
+	else if (!gameOngoing && gameDone && !gameOver && !gameEnd && !gameFuel) {
+		ofBitmapFont font = ofBitmapFont();
+		string text = "Landed Successfully.";
+		string restart = "Press ENTER to restart.";
+		int fontWidth = font.getBoundingBox(text, 0, 0).getWidth();
+		int fontHeight = font.getBoundingBox(text, 0, 0).getHeight();
+		ofDrawBitmapString(text, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2);
+		ofDrawBitmapString(restart, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 20);
+	}
+	// Crash Landed (landed too fast)
+	else if (!gameOngoing && gameOver && !gameDone && !gameEnd && !gameFuel) {
+		ofBitmapFont font = ofBitmapFont();
+		string text = "Crash Landed. Game Over.";
+		string restart = "Press ENTER to restart.";
+		int fontWidth = font.getBoundingBox(text, 0, 0).getWidth();
+		int fontHeight = font.getBoundingBox(text, 0, 0).getHeight();
+		ofDrawBitmapString(text, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2);
+		ofDrawBitmapString(restart, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 20);
+	}
+	// Landed out of bounds
+	else if (!gameOngoing && gameEnd && !gameDone && !gameOver && !gameFuel) {
+		ofBitmapFont font = ofBitmapFont();
+		string text = "Landed out of bounds. Game Over.";
+		string restart = "Press ENTER to restart.";
+		int fontWidth = font.getBoundingBox(text, 0, 0).getWidth();
+		int fontHeight = font.getBoundingBox(text, 0, 0).getHeight();
+		ofDrawBitmapString(text, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2);
+		ofDrawBitmapString(restart, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 20);
+	}
+	// Out of Fuel
+	else if (!gameOngoing && !gameEnd && !gameDone && !gameOver && gameFuel) {
+		ofBitmapFont font = ofBitmapFont();
+		string text = "Out of Fuel. Game Over.";
+		string restart = "Press ENTER to restart.";
+		int fontWidth = font.getBoundingBox(text, 0, 0).getWidth();
+		int fontHeight = font.getBoundingBox(text, 0, 0).getHeight();
+		ofDrawBitmapString(text, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2);
+		ofDrawBitmapString(restart, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 20);
+	}
+	else if (startScreen) {
+		ofBitmapFont font = ofBitmapFont();
+		string text = "Press Enter to Begin";
+		int fontWidth = font.getBoundingBox(text, 0, 0).getWidth();
+		int fontHeight = font.getBoundingBox(text, 0, 0).getHeight();
+		string title = "LunaX865 Landing Mission";
+		ofDrawBitmapString(title, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 - 100);
+		ofDrawBitmapString(text, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 - 80);
+		string mission = "Land in the 3 landing sites before fuel runs out.";
+		ofDrawBitmapString(mission, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 - 60);
+		string thruster ="SPACE = Thrust";
+		ofDrawBitmapString(thruster, ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 - 40);
+		ofDrawBitmapString("UP/DOWN = Move Forward/Backward", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 - 20);
+		ofDrawBitmapString("RIGHT/LEFT = Turning", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2);
+		ofDrawBitmapString("1 = Static Camera", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 20);
+		ofDrawBitmapString("2 = Tracking Camera", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 40);
+		ofDrawBitmapString("3 = Overhead Camera", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 60);
+		ofDrawBitmapString("4 = Cabin Camera", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 80);
+		ofDrawBitmapString("a = Toggle Lander Light", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 100);
+		ofDrawBitmapString("h = AGL", ofGetWidth()/2 - fontWidth/2, ofGetHeight()/2 - fontHeight/2 + 120);
+	}
 	glDepthMask(true);
 }
 
@@ -667,7 +790,7 @@ void ofApp::drawAxis(ofVec3f location) {
 void ofApp::keyPressed(int key) {
 
 	//Log key press
-	ofLogNotice() << "Key pressed: " << key;
+	// ofLogNotice() << "Key pressed: " << key;
 
 	if (key == ' ') {
 		thrust = true;
@@ -733,6 +856,9 @@ void ofApp::keyPressed(int key) {
 			cout << mainCam.getGlobalPosition() << endl;
 		}
 		break;
+	case 'D':
+	case 'd':
+		break;
 	case 'F':
 	case 'f':
 		ofToggleFullscreen();
@@ -788,6 +914,14 @@ void ofApp::keyPressed(int key) {
 	case OF_KEY_SHIFT:
 		break;
 	case OF_KEY_DEL:
+		break;
+	case OF_KEY_RETURN:
+		gameOngoing = true;
+		gameOver = false;
+		gameEnd = false;
+		gameDone = false;
+		gameFuel = false;
+		startScreen = false;
 		break;
 	default:
 		break;
@@ -1277,15 +1411,25 @@ bool ofApp::inSite(ofLight& site, glm::vec3 landingPos, float angle, float radiu
 
 void ofApp::checkLandingPosition(glm::vec3 landingPos) {
 	float radius = 20.0f;
+	gameDone = false;
+	gameEnd = false;
 
 	if (inSite(siteLight, landerPos, 45, radius)) {
 		cout << "Lander at site 1" << endl;
+		gameDone = true;
 	}
 	if (inSite(siteLight2, landerPos, 45, radius)) {
 		cout << "Lander at site 2" << endl;
+		gameDone = true;
 	}
 	if (inSite(siteLight3, landerPos, 45, radius)) {
 		cout << "Lander at site 3" << endl;
+		gameDone = true;
+	}
+
+	if (!gameDone) {
+		gameEnd = true;
+		cout << "Landed out of bounds" << endl;
 	}
 }
 
@@ -1299,4 +1443,70 @@ void ofApp::drawLandingRing(glm::vec3 pos, float radius) {
 	ofDrawCircle(0, 0, radius);
 
 	ofPopMatrix();
+}
+
+void ofApp::trackFuel() {
+	if (keypressed) {
+		if (!updateFuel) {
+			fuelElapsed = ofGetElapsedTimef();
+		}
+		updateFuel = true;
+
+		usedFuel = ofGetElapsedTimef() - fuelElapsed;
+		fuel = initFuel - usedFuel;
+		keypressed = false;
+	}
+	else {
+		if (updateFuel) {
+			initFuel -= usedFuel;
+		}
+		updateFuel = false;
+	}
+
+	if (fuel <= 0) {
+		gameOngoing = false;
+		gameFuel = true;
+		fuelTimeElapsed = ofGetElapsedTimef();
+	}
+}
+
+void ofApp::resetGame() {
+	gameOngoing = false;
+
+	// Reset fuel
+	fuel = 120;
+	initFuel = 120;
+	usedFuel = 0;
+	gameFuel = false;
+
+	// Reset positions
+	lander.setPosition(0, 80, 0);
+	lander.setRotation(0, 0, 0, 1, 0);
+	landerPos = glm::vec3(0, 50, 0);
+	landerRotation = 0;
+	landerVel = glm::vec3(0, 0, 0);
+
+	// Reset cams
+	mainCam.setPosition(150, 78, 124);
+	mainCam.lookAt(landerPos);
+
+	trackCam.setPosition(landerPos.x, landerPos.y + 20 , landerPos.z + 45);
+	trackCam.lookAt(landerPos);
+
+	landerCam.setPosition(landerPos.x, landerPos.y + 50 , landerPos.z);
+	landerCam.lookAt(glm::vec3(0,0,0));
+
+	cabinCam.setPosition(landerPos.x, landerPos.y + 10, landerPos.z);
+	cabinCam.lookAt(glm::vec3(0, 0, 0));
+
+	activeCam = &mainCam;
+
+	// Remove particles
+	for (int i = emitter.sys->particles.size() - 1; i >= 0; i --) {
+		emitter.sys->remove(i);
+	}
+
+	for (int i = explosionEmitter.sys->particles.size() - 1; i >= 0; i--) {
+		explosionEmitter.sys->remove(i);
+	}
 }
