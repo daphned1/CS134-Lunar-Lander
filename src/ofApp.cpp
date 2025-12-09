@@ -852,8 +852,6 @@ void ofApp::keyPressed(int key) {
 				easy->disableMouseInput();
 			else
 				easy->enableMouseInput();
-			cout << mainCam.getPosition() << endl;
-			cout << mainCam.getGlobalPosition() << endl;
 		}
 		break;
 	case 'D':
@@ -990,8 +988,10 @@ void ofApp::mouseMoved(int x, int y ){
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button) {
 
-	if (dynamic_cast<ofEasyCam *>(activeCam)) {
-		return; // EasyCam handles its own mouse input
+	if (auto easy = dynamic_cast<ofEasyCam *>(activeCam)) {
+		if (easy->getMouseInputEnabled()){
+			return;
+		}// EasyCam handles its own mouse input
 	}
 
 	//Update Lander Camera look at target where the mousepressed
@@ -1022,6 +1022,10 @@ void ofApp::mousePressed(int x, int y, int button) {
 	else {
 		ofVec3f p;
 		bool selected = raySelectWithOctree(p);
+	}
+
+	if (button == OF_MOUSE_BUTTON_RIGHT) {
+		setCameraTarget();
 	}
 }
 
@@ -1058,8 +1062,10 @@ void ofApp::mouseDragged(int x, int y, int button) {
 	//ofEasyCam * easy = dynamic_cast<ofEasyCam *>(activeCam);
 	//if ((easy && easy->getMouseInputEnabled())) return;
 
-	 if (dynamic_cast<ofEasyCam *>(activeCam)) {
-		return;
+	if (auto easy = dynamic_cast<ofEasyCam *>(activeCam)) {
+		if (easy->getMouseInputEnabled()){
+			return;
+		}// EasyCam handles its own mouse input
 	}
 
 	if (bInDrag) {
@@ -1102,8 +1108,10 @@ void ofApp::mouseDragged(int x, int y, int button) {
 
 //--------------------------------------------------------------
 void ofApp::mouseReleased(int x, int y, int button) {
-	if (dynamic_cast<ofEasyCam *>(activeCam)) {
-		return;
+	if (auto easy = dynamic_cast<ofEasyCam *>(activeCam)) {
+		if (easy->getMouseInputEnabled()){
+			return;
+		}// EasyCam handles its own mouse input
 	}
 	bInDrag = false;
 }
@@ -1113,7 +1121,43 @@ void ofApp::mouseReleased(int x, int y, int button) {
 // Set the camera to use the selected point as it's new target
 //  
 void ofApp::setCameraTarget() {
+	if (bLanderLoaded) {
+		glm::vec3 origin = activeCam->getPosition();
+		glm::vec3 mouseWorld = activeCam->screenToWorld(glm::vec3(mouseX, mouseY, 0));
+		glm::vec3 mouseDir = glm::normalize(mouseWorld - origin);
 
+		glm::vec3 target;
+
+		ofVec3f min = lander.getSceneMin() + lander.getPosition();
+		ofVec3f max = lander.getSceneMax() + lander.getPosition();
+
+		Box bounds = Box(Vector3(min.x, min.y, min.z), Vector3(max.x, max.y, max.z));
+		bool hit = bounds.intersect(Ray(Vector3(origin.x, origin.y, origin.z), Vector3(mouseDir.x, mouseDir.y, mouseDir.z)), 0, 10000);
+		if (hit) {
+			target = lander.getPosition();
+		}
+		
+		if (target == glm::vec3(0, 0, 0)) {
+			float distance;
+
+			bool hit = glm::intersectRayPlane(origin, mouseDir, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), distance);
+			if (hit) {
+				// find the point of intersection on the plane using the distance 
+				// We use the parameteric line or vector representation of a line to compute
+				//
+				// p' = p + s * dir;
+				//
+				glm::vec3 intersectPoint = origin + distance * mouseDir;
+				target = intersectPoint;
+			}
+		}
+
+		if (target != glm::vec3(0, 0, 0)) {
+			activeCam = &mainCam;
+			activeCam->lookAt(target);
+			currentCam = 1;
+		}
+	}
 }
 
 
@@ -1309,6 +1353,7 @@ glm::vec3 ofApp::getMousePointOnPlane(glm::vec3 planePt, glm::vec3 planeNorm) {
 	else return glm::vec3(0, 0, 0);
 }
 
+// Daphne Dao
 void ofApp::reverseCollision() {
 	if (collidedState) {
 		ofVec3f pos = lander.getPosition();
@@ -1327,6 +1372,7 @@ void ofApp::reverseCollision() {
 	}
 }
 
+// Daphne Dao
 void ofApp::getAGL() {
 	glm::vec3 pos = lander.getPosition();
 	glm::vec3 dir = glm::vec3(0, -1, 0); // points down
@@ -1341,6 +1387,7 @@ void ofApp::getAGL() {
 
 // load vertex buffer in preparation for rendering
 //
+// Daphne Dao
 void ofApp::loadVbo() {
 	if (emitter.sys->particles.size() < 1) return;
 
@@ -1360,6 +1407,7 @@ void ofApp::loadVbo() {
 
 // load vertex buffer in preparation for rendering
 //
+// Daphne Dao
 void ofApp::loadExplosionVbo() {
 	if (explosionEmitter.sys->particles.size() < 1) return;
 
@@ -1378,6 +1426,7 @@ void ofApp::loadExplosionVbo() {
 }
 
 //Swiching between cameras
+// Ellie Tu
 void ofApp::switchCam(int n) {
 
 	ofEasyCam * easy = dynamic_cast<ofEasyCam *>(activeCam);
@@ -1395,6 +1444,7 @@ void ofApp::switchCam(int n) {
 	currentCam = n;
 }
 
+// Daphne Dao
 bool ofApp::inSite(ofLight& site, glm::vec3 landingPos, float angle, float radius) {
 	glm::vec3 sitePos = site.getPosition();
 	glm::vec3 dir = glm::normalize(site.getLookAtDir());
@@ -1409,6 +1459,7 @@ bool ofApp::inSite(ofLight& site, glm::vec3 landingPos, float angle, float radiu
 	return delta <= angle;
 }
 
+// Daphne Dao
 void ofApp::checkLandingPosition(glm::vec3 landingPos) {
 	float radius = 20.0f;
 	gameDone = false;
@@ -1433,6 +1484,7 @@ void ofApp::checkLandingPosition(glm::vec3 landingPos) {
 	}
 }
 
+// Daphne Dao
 void ofApp::drawLandingRing(glm::vec3 pos, float radius) {
 	ofPushMatrix();
 	ofTranslate(pos);
@@ -1445,6 +1497,7 @@ void ofApp::drawLandingRing(glm::vec3 pos, float radius) {
 	ofPopMatrix();
 }
 
+// Daphne Dao
 void ofApp::trackFuel() {
 	if (keypressed) {
 		if (!updateFuel) {
@@ -1470,6 +1523,7 @@ void ofApp::trackFuel() {
 	}
 }
 
+// Daphne Dao
 void ofApp::resetGame() {
 	gameOngoing = false;
 
