@@ -5,8 +5,8 @@
 //  Octree Test - startup scene
 // 
 //
-//  Student Name:   < Your Name goes Here >
-//  Date: <date of last version>
+//  Student Name: Daphne Dao and Ellie Tu
+//  Date: 12/10/25
 
 
 #include "ofApp.h"
@@ -104,11 +104,11 @@ void ofApp::setup(){
 	/* -------------------------------------------------------------------------- */
 	/*                                 Load models                                */
 	/* -------------------------------------------------------------------------- */
-	mars.loadModel("geo/BigMoonBaseBrighter.obj");
+	mars.loadModel("geo/BigMoonBase.obj");
 	mars.setScaleNormalization(false);
 	
 
-	if (lander.loadModel("geo/MoonLander.obj")) {
+	if (lander.loadModel("geo/Lander.obj")) {
 		bLanderLoaded = true;
 		lander.setScaleNormalization(false);
 		lander.setPosition(0, 80, 0);
@@ -303,7 +303,7 @@ void ofApp::update() {
 			ofVec3f currentPos = trackCam.getPosition();
 			ofVec3f targetPos = ofVec3f(landerPos.x, landerPos.y + 20, landerPos.z + 45);
 			trackCam.setPosition(currentPos.interpolate(targetPos, 0.1));
-			trackCam.lookAt(lander.getPosition());
+			trackCam.lookAt(landerPos + glm::vec3(0, 10, 0) - glm::vec3(glm::rotate(glm::mat4(1.0), glm::radians(landerRotation), glm::vec3(0,1,0)) * glm::vec4(0,0,-1,1)) * 10);
 		}
 		else if (currentCam == 3) {
 			ofVec3f currentPos = landerCam.getPosition();

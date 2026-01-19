@@ -48,10 +48,19 @@ xcuserdata
 *.ilk
 *.aps
 ipch/
+*.sln
+*.vcxproj
+.vcxproj/*
+.rc
 
 # VSCode
 .vs/*
 .vs
+*.make
+*.code-workspace
+.vscode
+dll
+
 
 # Eclipse
 .metadata
